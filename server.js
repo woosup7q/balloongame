@@ -72,6 +72,13 @@ io.on('connection', (socket) => {
     console.log(`방 입장: ${code}`);
   });
 
+  // ===== 게임 화면 상태 전달 =====
+  socket.on('stateUpdate', (state) => {
+    const code = socket.roomCode;
+    if (!code || !rooms[code]) return;
+    socket.to(code).emit('opponentState', state);
+  });
+
   // ===== 점수 업데이트 =====
   socket.on('scoreUpdate', (score) => {
     const code = socket.roomCode;

@@ -490,6 +490,7 @@ let gameMode='single'; // 'single' | 'multi'
 let mpState='';        // 'waiting' | 'playing'
 let myPlayerNum=0, roomCode='', opponentScore=0;
 let roomList=[], serverMsg='', matchResult=null;
+let opponentGameState=null, frameCount=0;
 
 function bgScreen(){
   const g=ctx.createLinearGradient(0,0,0,H);
@@ -519,6 +520,7 @@ function connectSocket(){
     gState='playing';
   });
   socket.on('opponentScore',(s)=>{opponentScore=s;});
+  socket.on('opponentState',(s)=>{opponentGameState=s;});
   socket.on('matchResult',(data)=>{matchResult=data;gState='result';});
   socket.on('opponentLeft',()=>{serverMsg='상대방이 나갔어 😢';gState='menu';mpState='';});
   socket.on('roomsUpdate',(list)=>{roomList=list;});
@@ -822,6 +824,32 @@ canvas.addEventListener('wheel',e=>{
   if(shopOpen){shopScroll=Math.max(0,Math.min(MAX_SCROLL,shopScroll+(e.deltaY>0?1:-1)));e.preventDefault();}
 },{passive:false});
 
+// ===== 상대방 미니 화면 =====
+function drawOpponentMini(){
+  if(!opponentGameState) return;
+  const sc=0.22, mw=Math.floor(800*sc), mh=Math.floor(600*sc);  // 176 x 132
+  const mx=W-mw-8, my=H-mh-58;
+  // 배경 + 테두리
+  ctx.fillStyle='rgba(0,0,0,0.75)';ctx.fillRect(mx-2,my-18,mw+4,mh+20);
+  ctx.strokeStyle='#FF6666';ctx.lineWidth=2;ctx.strokeRect(mx-2,my-18,mw+4,mh+20);
+  ctx.font='bold 11px Arial';ctx.fillStyle='#FF9999';ctx.textAlign='left';ctx.fillText('👤 상대방 화면',mx,my-5);
+  // 클립 영역 설정
+  ctx.save();
+  ctx.beginPath();ctx.rect(mx,my,mw,mh);ctx.clip();
+  ctx.translate(mx,my);ctx.scale(sc,sc);
+  // 하늘색 배경
+  ctx.fillStyle='#5599CC';ctx.fillRect(0,0,800,600);
+  ctx.fillStyle='#44AA44';ctx.fillRect(0,500,800,100);
+  // 풍선 그리기
+  const s=opponentGameState;
+  if(s.balloons)for(const b of s.balloons){ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fillStyle=b.color;ctx.fill();}
+  // 보스 그리기
+  if(s.boss){ctx.beginPath();ctx.arc(s.boss.x,s.boss.y,s.boss.r,0,Math.PI*2);ctx.fillStyle=s.boss.color||'#FF2222';ctx.fill();}
+  // 화살 그리기
+  if(s.arrows)for(const a of s.arrows){ctx.beginPath();ctx.arc(a.x,a.y,5,0,Math.PI*2);ctx.fillStyle='#FFD700';ctx.fill();}
+  ctx.restore();
+}
+
 // ===== GAME LOOP =====
 function gameLoop(ts){
   const dt=Math.min((ts-lastT)/1000,0.05);lastT=ts;
@@ -876,6 +904,8 @@ function gameLoop(ts){
     arrows=arrows.filter(a=>!a.offScreen());
     fx=fx.filter(e=>!e.done());popups=popups.filter(p=>!p.done());lightFX=lightFX.filter(l=>!l.done());
     mpSendScore();
+    frameCount++;
+    if(frameCount%4===0&&socket&&mpState==='playing'){socket.emit('stateUpdate',{balloons:balloons.map(b=>({x:b.x,y:b.y,r:b.r,color:b.color})),arrows:arrows.map(a=>({x:a.x,y:a.y,angle:a.angle})),boss:boss?{x:boss.x,y:boss.y,r:boss.r,color:boss.color}:null});}
     if(score>=targetScore&&!boss){saveHS(level,world,totalScore);if(level%100===0){showOv(`WORLD ${world} CLEAR! 🎉`,`Entering World ${world+1}...`,'#FFD700',3500,()=>{world++;level=1;totalScore=0;resetUpg();arrowsLeft=DS.arrows;refillTimer=0;startBGM(world-1);score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];});}else{showOv(`LEVEL ${level} CLEAR!`,`→ Level ${level+1}`,'#32CD32',2000,()=>{level++;score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];});}}
     if(timeLeft<=0){saveHS(level,world,totalScore);mpSendScore();mpGameOver();if(socket)socket.emit('saveScore',{playerName:'Player',score:totalScore,world,level,diff:Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal'});const hs=loadHS();showOv('GAME OVER',`World ${world}  Level ${level}  |  Best: W${hs.world} L${hs.level}`,'#DC143C',2500,()=>{if(mpState!=='playing'){gState='menu';stopBGM();startBGM(0);}});}
   }
@@ -933,6 +963,7 @@ function gameLoop(ts){
   ctx.font='14px Arial';ctx.fillStyle='#888';ctx.textAlign='center';ctx.fillText('← → aim  |  SPACE to shoot',W/2,H-58);
   // overlay
   if(ovData){ctx.fillStyle='rgba(0,0,0,0.62)';ctx.fillRect(0,0,W,H);ctx.font='bold 70px Arial';ctx.fillStyle=ovData.color;ctx.textAlign='center';ctx.fillText(ovData.title,W/2,230);ctx.font='32px Arial';ctx.fillStyle='#FFF';ctx.fillText(ovData.sub,W/2,310);}
+  if(mpState==='playing')drawOpponentMini();
   if(shopOpen)drawShop();
   if(helpOpen)drawHelp();
   requestAnimationFrame(gameLoop);
