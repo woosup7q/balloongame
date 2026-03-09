@@ -87,20 +87,18 @@ function saveHS(lv,wo,sc) {
 }
 
 // ===== 진행상황 저장/불러오기 =====
-// saveProg(): 지금 하던 게임 상태를 컴퓨터에 저장해!
-// 마치 게임에서 세이브 포인트를 찍는 것처럼.
+// 난이도마다 다른 저장 슬롯을 써! 'balloonSave_easy', 'balloonSave_normal', 'balloonSave_hard'
+function saveKey(dk){return 'balloonSave_'+(dk||'normal');}
 function saveProg(){
   const dk=Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal';
-  localStorage.setItem('balloonSave',JSON.stringify({world,level,totalScore,upg,arrowsLeft,diff:dk}));
+  localStorage.setItem(saveKey(dk),JSON.stringify({world,level,totalScore,upg,arrowsLeft,diff:dk}));
 }
-// loadProg(): 저장된 데이터가 있으면 불러와, 없으면 null 반환
-function loadProg(){try{const s=localStorage.getItem('balloonSave');return s?JSON.parse(s):null;}catch{return null;}}
-// deleteProg(): 저장 데이터 삭제 (새 게임 시작할 때)
-function deleteProg(){localStorage.removeItem('balloonSave');}
-// continueSave(): 저장된 진도로 게임 시작!
+function loadProg(dk){try{const s=localStorage.getItem(saveKey(dk));return s?JSON.parse(s):null;}catch{return null;}}
+function deleteProg(dk){localStorage.removeItem(saveKey(dk));}
+// continueSave(): 저장된 진도로 게임 시작! (이미 DS가 설정된 상태에서 호출)
 function continueSave(){
-  const sv=loadProg();if(!sv)return;
-  DS=DIFF[sv.diff]||DIFF.normal;
+  const dk=Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal';
+  const sv=loadProg(dk);if(!sv)return;
   world=sv.world||1;level=sv.level||1;totalScore=sv.totalScore||0;
   upg=sv.upg||{};for(const i of SHOP)if(upg[i.id]===undefined)upg[i.id]=0;
   arrowsLeft=sv.arrowsLeft??DS.arrows;
@@ -561,41 +559,17 @@ let menuBtns=[];
 function drawMenu(){
   bgScreen();
   ctx.textAlign='center';
-  ctx.font='bold 70px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON GAME',W/2,95);
+  ctx.font='bold 70px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON GAME',W/2,105);
+  ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,150);
   menuBtns=[];
-  const sv=loadProg();
-  if(sv){
-    // 저장 데이터 있을 때: 계속하기 + 새 게임 + 멀티
-    ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('어서 와, 계속 할 거야? 👋',W/2,135);
-    // 계속하기 버튼 (초록 + 금색 테두리)
-    const cb={x:W/2-175,y:155,w:350,h:75};
-    rr(cb.x,cb.y,cb.w,cb.h,16,'#5A3A00','#FFD700',3);
-    ctx.font='bold 30px Arial';ctx.fillStyle='#FFD700';ctx.fillText('▶ 계속하기',W/2,cb.y+38);
-    ctx.font='16px Arial';ctx.fillStyle='#FFEEAA';
-    ctx.fillText(`World ${sv.world}  Level ${sv.level}  (${sv.diff?.toUpperCase()||'NORMAL'})  💰${sv.totalScore}pts`,W/2,cb.y+62);
-    menuBtns.push({rect:cb,key:'continue'});
-    // 새 게임 버튼
-    const sb={x:W/2-175,y:248,w:350,h:62};
-    rr(sb.x,sb.y,sb.w,sb.h,14,'#1D6B33','#3CDC64',3);
-    ctx.font='bold 28px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 새 게임',W/2,sb.y+sb.h/2+10);
-    menuBtns.push({rect:sb,key:'single'});
-    // 멀티플레이 버튼
-    const mb={x:W/2-175,y:328,w:350,h:62};
-    rr(mb.x,mb.y,mb.w,mb.h,14,'#1A3A6B','#50A0FF',3);
-    ctx.font='bold 28px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+10);
-    menuBtns.push({rect:mb,key:'multi'});
-  } else {
-    // 저장 없을 때: 기존 레이아웃
-    ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,145);
-    const sb={x:W/2-160,y:205,w:320,h:80};
-    rr(sb.x,sb.y,sb.w,sb.h,16,'#1D6B33','#3CDC64',3);
-    ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+12);
-    menuBtns.push({rect:sb,key:'single'});
-    const mb={x:W/2-160,y:315,w:320,h:80};
-    rr(mb.x,mb.y,mb.w,mb.h,16,'#1A3A6B','#50A0FF',3);
-    ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+12);
-    menuBtns.push({rect:mb,key:'multi'});
-  }
+  const sb={x:W/2-160,y:210,w:320,h:80};
+  rr(sb.x,sb.y,sb.w,sb.h,16,'#1D6B33','#3CDC64',3);
+  ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+12);
+  menuBtns.push({rect:sb,key:'single'});
+  const mb={x:W/2-160,y:320,w:320,h:80};
+  rr(mb.x,mb.y,mb.w,mb.h,16,'#1A3A6B','#50A0FF',3);
+  ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+12);
+  menuBtns.push({rect:mb,key:'multi'});
   const hs=loadHS();
   ctx.font='18px Arial';ctx.fillStyle='#FFD700';
   ctx.fillText(`🏆 최고기록: World ${hs.world}  Level ${hs.level}  ${hs.score}pts`,W/2,H-40);
@@ -628,7 +602,42 @@ function drawDiffSelect(){
   drawExitBtn();
 }
 
-// ③ 서버 목록 화면 (멀티용)
+// ③ 저장 선택 화면 (싱글용: 난이도 선택 후)
+let saveBtns=[], saveBackBtn2=null;
+function drawSaveSelect(){
+  bgScreen();
+  ctx.textAlign='center';
+  ctx.font='bold 36px Arial';ctx.fillStyle=DS.color;ctx.fillText(`${DS.label} 모드`,W/2,65);
+  ctx.font='26px Arial';ctx.fillStyle='#FFF';ctx.fillText('저장된 게임이 있어!',W/2,105);
+  saveBtns=[];
+  const dk=Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal';
+  const sv=loadProg(dk);
+  if(sv){
+    // 저장 있을 때: 계속하기 + 새 게임
+    const cb={x:W/2-185,y:140,w:370,h:88};
+    rr(cb.x,cb.y,cb.w,cb.h,16,'#5A3A00','#FFD700',3);
+    ctx.font='bold 30px Arial';ctx.fillStyle='#FFD700';ctx.fillText('▶  계속하기',W/2,cb.y+40);
+    ctx.font='17px Arial';ctx.fillStyle='#FFEEAA';
+    ctx.fillText(`World ${sv.world}  •  Level ${sv.level}  •  💰 ${sv.totalScore}pts`,W/2,cb.y+70);
+    saveBtns.push({rect:cb,key:'continue'});
+    const nb={x:W/2-185,y:248,w:370,h:68};
+    rr(nb.x,nb.y,nb.w,nb.h,14,'#333','#AAA',2);
+    ctx.font='bold 26px Arial';ctx.fillStyle='#DDD';ctx.fillText('🗑 새 게임으로 시작 (저장 삭제)',W/2,nb.y+nb.h/2+9);
+    saveBtns.push({rect:nb,key:'newgame'});
+    ctx.font='14px Arial';ctx.fillStyle='#FF8888';ctx.fillText('⚠ 새 게임을 하면 이 난이도의 저장이 지워져!',W/2,332);
+  } else {
+    // 저장 없을 때: 바로 시작 버튼 하나
+    ctx.font='22px Arial';ctx.fillStyle='#AAA';ctx.fillText('아직 저장된 게임이 없어.',W/2,160);
+    const nb={x:W/2-185,y:195,w:370,h:80};
+    rr(nb.x,nb.y,nb.w,nb.h,16,'#1D6B33','#3CDC64',3);
+    ctx.font='bold 30px Arial';ctx.fillStyle='#FFF';ctx.fillText('▶  새 게임 시작!',W/2,nb.y+nb.h/2+11);
+    saveBtns.push({rect:nb,key:'newgame'});
+  }
+  saveBackBtn2=backBtn();
+  drawExitBtn();
+}
+
+// ④ 서버 목록 화면 (멀티용)
 let serverBtns=[], serverBackBtn=null, serverCreateBtn=null, serverRefreshBtn=null;
 function drawServerList(){
   bgScreen();
@@ -760,6 +769,7 @@ window.addEventListener('keydown',e=>{
   keysDown[e.code]=true;
   if(e.key==='Escape'){
     if(gState==='diffSelect'){gState='menu';return;}
+    if(gState==='saveSelect'){gState='diffSelect';return;}
     if(gState==='serverList'){gState='diffSelect';return;}
     if(gState==='waiting'){gState='serverList';if(socket)socket.emit('leaveRoom');return;}
   }
@@ -838,8 +848,6 @@ canvas.addEventListener('click',e=>{
   if(gState==='menu'){
     for(const b of menuBtns){
       if(inR(mx,my,b.rect)){
-        if(b.key==='continue'){continueSave();return;}  // 계속하기!
-        if(b.key==='single')deleteProg();               // 새 게임은 저장 삭제
         gameMode=b.key; gState='diffSelect'; return;
       }
     }
@@ -851,8 +859,20 @@ canvas.addEventListener('click',e=>{
     for(const b of diffBtns){
       if(inR(mx,my,b.rect)){
         DS=DIFF[b.key];
-        if(gameMode==='single'){resetGame(b.key);return;}
+        if(gameMode==='single'){gState='saveSelect';return;}  // 저장 선택 화면으로!
         else{connectSocket();serverMsg='';socket.emit('getRooms');gState='serverList';return;}
+      }
+    }
+    return;
+  }
+  // ③ 저장 선택 (싱글)
+  if(gState==='saveSelect'){
+    if(saveBackBtn2&&inR(mx,my,saveBackBtn2)){gState='diffSelect';return;}
+    const dk=Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal';
+    for(const b of saveBtns){
+      if(inR(mx,my,b.rect)){
+        if(b.key==='continue'){continueSave();return;}
+        if(b.key==='newgame'){deleteProg(dk);resetGame(dk);return;}
       }
     }
     return;
@@ -964,6 +984,7 @@ function gameLoop(ts){
 
   if(gState==='menu'){drawMenu();requestAnimationFrame(gameLoop);return;}
   if(gState==='diffSelect'){drawDiffSelect();requestAnimationFrame(gameLoop);return;}
+  if(gState==='saveSelect'){drawSaveSelect();requestAnimationFrame(gameLoop);return;}
   if(gState==='serverList'){drawServerList();requestAnimationFrame(gameLoop);return;}
   let _waitBackBtn=null;
   if(gState==='waiting'){_waitBackBtn=drawWaiting();requestAnimationFrame(gameLoop);return;}
