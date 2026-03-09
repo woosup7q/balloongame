@@ -84,6 +84,31 @@ function saveHS(lv,wo,sc) {
   if (c) localStorage.setItem('balloonHS',JSON.stringify(h));
 }
 
+// ===== 진행상황 저장/불러오기 =====
+// saveProg(): 지금 하던 게임 상태를 컴퓨터에 저장해!
+// 마치 게임에서 세이브 포인트를 찍는 것처럼.
+function saveProg(){
+  const dk=Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal';
+  localStorage.setItem('balloonSave',JSON.stringify({world,level,totalScore,upg,arrowsLeft,diff:dk}));
+}
+// loadProg(): 저장된 데이터가 있으면 불러와, 없으면 null 반환
+function loadProg(){try{const s=localStorage.getItem('balloonSave');return s?JSON.parse(s):null;}catch{return null;}}
+// deleteProg(): 저장 데이터 삭제 (새 게임 시작할 때)
+function deleteProg(){localStorage.removeItem('balloonSave');}
+// continueSave(): 저장된 진도로 게임 시작!
+function continueSave(){
+  const sv=loadProg();if(!sv)return;
+  DS=DIFF[sv.diff]||DIFF.normal;
+  world=sv.world||1;level=sv.level||1;totalScore=sv.totalScore||0;
+  upg=sv.upg||{};for(const i of SHOP)if(upg[i.id]===undefined)upg[i.id]=0;
+  arrowsLeft=sv.arrowsLeft??DS.arrows;
+  score=0;freezeTimer=0;refillTimer=0;shopOpen=false;shopScroll=0;
+  boss=null;bossSpawned=false;balloons=[];arrows=[];fx=[];popups=[];lightFX=[];
+  spawnT=0;bow=new Bow();
+  timeLeft=getTime(level);targetScore=getTarget(level,world);
+  startBGM(world-1);gState='playing';ovData=null;
+}
+
 // ===== WORLD THEMES =====
 const THEMES = [
   {st:[100,180,255],sb:[180,230,255],gr:[34,139,34], cl:[255,255,255],name:"World 1"},
@@ -531,19 +556,41 @@ let menuBtns=[];
 function drawMenu(){
   bgScreen();
   ctx.textAlign='center';
-  ctx.font='bold 70px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON GAME',W/2,105);
-  ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,150);
+  ctx.font='bold 70px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON GAME',W/2,95);
   menuBtns=[];
-  // 싱글플레이 버튼 (위)
-  const sb={x:W/2-160,y:210,w:320,h:80};
-  rr(sb.x,sb.y,sb.w,sb.h,16,'#1D6B33','#3CDC64',3);
-  ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+12);
-  menuBtns.push({rect:sb,key:'single'});
-  // 멀티플레이 버튼 (아래)
-  const mb={x:W/2-160,y:320,w:320,h:80};
-  rr(mb.x,mb.y,mb.w,mb.h,16,'#1A3A6B','#50A0FF',3);
-  ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+12);
-  menuBtns.push({rect:mb,key:'multi'});
+  const sv=loadProg();
+  if(sv){
+    // 저장 데이터 있을 때: 계속하기 + 새 게임 + 멀티
+    ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('어서 와, 계속 할 거야? 👋',W/2,135);
+    // 계속하기 버튼 (초록 + 금색 테두리)
+    const cb={x:W/2-175,y:155,w:350,h:75};
+    rr(cb.x,cb.y,cb.w,cb.h,16,'#5A3A00','#FFD700',3);
+    ctx.font='bold 30px Arial';ctx.fillStyle='#FFD700';ctx.fillText('▶ 계속하기',W/2,cb.y+38);
+    ctx.font='16px Arial';ctx.fillStyle='#FFEEAA';
+    ctx.fillText(`World ${sv.world}  Level ${sv.level}  (${sv.diff?.toUpperCase()||'NORMAL'})  💰${sv.totalScore}pts`,W/2,cb.y+62);
+    menuBtns.push({rect:cb,key:'continue'});
+    // 새 게임 버튼
+    const sb={x:W/2-175,y:248,w:350,h:62};
+    rr(sb.x,sb.y,sb.w,sb.h,14,'#1D6B33','#3CDC64',3);
+    ctx.font='bold 28px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 새 게임',W/2,sb.y+sb.h/2+10);
+    menuBtns.push({rect:sb,key:'single'});
+    // 멀티플레이 버튼
+    const mb={x:W/2-175,y:328,w:350,h:62};
+    rr(mb.x,mb.y,mb.w,mb.h,14,'#1A3A6B','#50A0FF',3);
+    ctx.font='bold 28px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+10);
+    menuBtns.push({rect:mb,key:'multi'});
+  } else {
+    // 저장 없을 때: 기존 레이아웃
+    ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,145);
+    const sb={x:W/2-160,y:205,w:320,h:80};
+    rr(sb.x,sb.y,sb.w,sb.h,16,'#1D6B33','#3CDC64',3);
+    ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+12);
+    menuBtns.push({rect:sb,key:'single'});
+    const mb={x:W/2-160,y:315,w:320,h:80};
+    rr(mb.x,mb.y,mb.w,mb.h,16,'#1A3A6B','#50A0FF',3);
+    ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+12);
+    menuBtns.push({rect:mb,key:'multi'});
+  }
   const hs=loadHS();
   ctx.font='18px Arial';ctx.fillStyle='#FFD700';
   ctx.fillText(`🏆 최고기록: World ${hs.world}  Level ${hs.level}  ${hs.score}pts`,W/2,H-40);
@@ -753,7 +800,7 @@ canvas.addEventListener('click',e=>{
   }
   // exit button
   if(inR(mx,my,{x:W-70,y:5,w:60,h:36})){
-    if(gState==='playing')saveHS(level,world,totalScore);
+    if(gState==='playing'){saveHS(level,world,totalScore);if(gameMode==='single')saveProg();}
     gState='menu';stopBGM();startBGM(0);return;
   }
   // ? help button (circle at 130, H-31, r=15)
@@ -765,6 +812,8 @@ canvas.addEventListener('click',e=>{
   if(gState==='menu'){
     for(const b of menuBtns){
       if(inR(mx,my,b.rect)){
+        if(b.key==='continue'){continueSave();return;}  // 계속하기!
+        if(b.key==='single')deleteProg();               // 새 게임은 저장 삭제
         gameMode=b.key; gState='diffSelect'; return;
       }
     }
@@ -906,8 +955,8 @@ function gameLoop(ts){
     mpSendScore();
     frameCount++;
     if(frameCount%4===0&&socket&&mpState==='playing'){socket.emit('stateUpdate',{balloons:balloons.map(b=>({x:b.x,y:b.y,r:b.r,color:b.color})),arrows:arrows.map(a=>({x:a.x,y:a.y,angle:a.angle})),boss:boss?{x:boss.x,y:boss.y,r:boss.r,color:boss.color}:null});}
-    if(score>=targetScore&&!boss){saveHS(level,world,totalScore);if(level%100===0){showOv(`WORLD ${world} CLEAR! 🎉`,`Entering World ${world+1}...`,'#FFD700',3500,()=>{world++;level=1;totalScore=0;resetUpg();arrowsLeft=DS.arrows;refillTimer=0;startBGM(world-1);score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];});}else{showOv(`LEVEL ${level} CLEAR!`,`→ Level ${level+1}`,'#32CD32',2000,()=>{level++;score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];});}}
-    if(timeLeft<=0){saveHS(level,world,totalScore);mpSendScore();mpGameOver();if(socket)socket.emit('saveScore',{playerName:'Player',score:totalScore,world,level,diff:Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal'});const hs=loadHS();showOv('GAME OVER',`World ${world}  Level ${level}  |  Best: W${hs.world} L${hs.level}`,'#DC143C',2500,()=>{if(mpState!=='playing'){gState='menu';stopBGM();startBGM(0);}});}
+    if(score>=targetScore&&!boss){saveHS(level,world,totalScore);if(level%100===0){showOv(`WORLD ${world} CLEAR! 🎉`,`Entering World ${world+1}...`,'#FFD700',3500,()=>{world++;level=1;totalScore=0;resetUpg();arrowsLeft=DS.arrows;refillTimer=0;startBGM(world-1);score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];if(gameMode==='single')saveProg();});}else{showOv(`LEVEL ${level} CLEAR!`,`→ Level ${level+1}`,'#32CD32',2000,()=>{level++;score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];if(gameMode==='single')saveProg();});}}
+    if(timeLeft<=0){saveHS(level,world,totalScore);if(gameMode==='single')deleteProg();mpSendScore();mpGameOver();if(socket)socket.emit('saveScore',{playerName:'Player',score:totalScore,world,level,diff:Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal'});const hs=loadHS();showOv('GAME OVER',`World ${world}  Level ${level}  |  Best: W${hs.world} L${hs.level}`,'#DC143C',2500,()=>{if(mpState!=='playing'){gState='menu';stopBGM();startBGM(0);}});}
   }
   if(ovData&&performance.now()>ovData.until){const cb=ovData.cb;ovData=null;if(cb)cb();}
 
