@@ -571,23 +571,26 @@ function connectSocket(){
 let menuBtns=[];
 function drawMenu(){
   bgScreen();
-  ctx.textAlign='center';
-  // 로고 이미지 (520x200 원본을 680x262로 확대해서 중앙에)
-  const lw=680, lh=Math.round(680*200/520);
+  // 작은 로고 (왼쪽) + "Balloon Burst!" 텍스트 (오른쪽)
+  const lw=150, lh=Math.round(150*200/520);  // 로고 작게 (150x58)
   if(logoImg.complete && logoImg.naturalWidth>0){
-    ctx.drawImage(logoImg, W/2-lw/2, 8, lw, lh);
-  } else {
-    // 로고 아직 안 로드됐을 때 텍스트 대체
-    ctx.font='bold 60px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON BLAST',W/2,100);
+    ctx.drawImage(logoImg, 28, 18, lw, lh);
   }
-  ctx.font='20px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,lh+24);
+  // "Balloon Burst!" 제목 텍스트
+  ctx.textAlign='left';
+  ctx.font='bold 56px Arial Black, Arial';ctx.fillStyle='#FFD700';
+  ctx.fillText('Balloon',190,62);
+  ctx.font='bold 56px Arial Black, Arial';ctx.fillStyle='#FF8C00';
+  ctx.fillText('Burst!',190,115);
+  // 부제목
+  ctx.font='18px Arial';ctx.fillStyle='#A0A0DD';ctx.textAlign='center';
+  ctx.fillText('게임 모드를 선택해봐!',W/2,145);
   menuBtns=[];
-  const by0=lh+38;
-  const sb={x:W/2-160,y:by0,w:320,h:74};
+  const sb={x:W/2-160,y:170,w:320,h:76};
   rr(sb.x,sb.y,sb.w,sb.h,16,'#1D6B33','#3CDC64',3);
-  ctx.font='bold 32px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+11);
+  ctx.font='bold 32px Arial';ctx.fillStyle='#FFF';ctx.textAlign='center';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+11);
   menuBtns.push({rect:sb,key:'single'});
-  const mb={x:W/2-160,y:by0+84,w:320,h:74};
+  const mb={x:W/2-160,y:258,w:320,h:76};
   rr(mb.x,mb.y,mb.w,mb.h,16,'#1A3A6B','#50A0FF',3);
   ctx.font='bold 32px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+11);
   menuBtns.push({rect:mb,key:'multi'});
