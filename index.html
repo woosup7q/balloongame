@@ -18,6 +18,10 @@ const canvas = document.getElementById('g');
 const ctx    = canvas.getContext('2d');
 const W = 800, H = 600;
 
+// ===== 로고 이미지 미리 로드 =====
+const logoImg = new Image();
+logoImg.src = '/logo.svg';
+
 // ===== AUDIO =====
 let ac = null;
 let masterVol = parseFloat(localStorage.getItem('balloonVol')||'1'); // 0~1 사이 소리 크기
@@ -568,20 +572,28 @@ let menuBtns=[];
 function drawMenu(){
   bgScreen();
   ctx.textAlign='center';
-  ctx.font='bold 70px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON GAME',W/2,105);
-  ctx.font='24px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,150);
+  // 로고 이미지 (520x200 원본을 680x262로 확대해서 중앙에)
+  const lw=680, lh=Math.round(680*200/520);
+  if(logoImg.complete && logoImg.naturalWidth>0){
+    ctx.drawImage(logoImg, W/2-lw/2, 8, lw, lh);
+  } else {
+    // 로고 아직 안 로드됐을 때 텍스트 대체
+    ctx.font='bold 60px Arial';ctx.fillStyle='#FFD700';ctx.fillText('🎈 BALLOON BLAST',W/2,100);
+  }
+  ctx.font='20px Arial';ctx.fillStyle='#A0A0DD';ctx.fillText('게임 모드를 선택해봐!',W/2,lh+24);
   menuBtns=[];
-  const sb={x:W/2-160,y:210,w:320,h:80};
+  const by0=lh+38;
+  const sb={x:W/2-160,y:by0,w:320,h:74};
   rr(sb.x,sb.y,sb.w,sb.h,16,'#1D6B33','#3CDC64',3);
-  ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+12);
+  ctx.font='bold 32px Arial';ctx.fillStyle='#FFF';ctx.fillText('🎮 싱글플레이',W/2,sb.y+sb.h/2+11);
   menuBtns.push({rect:sb,key:'single'});
-  const mb={x:W/2-160,y:320,w:320,h:80};
+  const mb={x:W/2-160,y:by0+84,w:320,h:74};
   rr(mb.x,mb.y,mb.w,mb.h,16,'#1A3A6B','#50A0FF',3);
-  ctx.font='bold 34px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+12);
+  ctx.font='bold 32px Arial';ctx.fillStyle='#FFF';ctx.fillText('🌐 멀티플레이',W/2,mb.y+mb.h/2+11);
   menuBtns.push({rect:mb,key:'multi'});
   const hs=loadHS();
-  ctx.font='18px Arial';ctx.fillStyle='#FFD700';
-  ctx.fillText(`🏆 최고기록: World ${hs.world}  Level ${hs.level}  ${hs.score}pts`,W/2,H-40);
+  ctx.font='17px Arial';ctx.fillStyle='#FFD700';
+  ctx.fillText(`🏆 최고기록: World ${hs.world}  Level ${hs.level}  ${hs.score}pts`,W/2,H-30);
   drawExitBtn();
 }
 
