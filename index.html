@@ -20,8 +20,10 @@ const W = 800, H = 600;
 
 // ===== AUDIO =====
 let ac = null;
+let masterVol = parseFloat(localStorage.getItem('balloonVol')||'1'); // 0~1 사이 소리 크기
 function initAudio() { if (!ac) ac = new (window.AudioContext||window.webkitAudioContext)(); }
 function playTone(freq, dur, vol=0.18, type='square') {
+  vol = vol * masterVol; // 마스터 볼륨 적용!
   if (!ac) return;
   const o = ac.createOscillator(), g = ac.createGain();
   o.connect(g); g.connect(ac.destination);
@@ -35,7 +37,7 @@ function playPop() {
   const n = Math.floor(ac.sampleRate * 0.09);
   const buf = ac.createBuffer(1, n, ac.sampleRate);
   const d = buf.getChannelData(0);
-  for (let i=0; i<n; i++) d[i] = (Math.random()*2-1)*(1-i/n)*0.45;
+  for (let i=0; i<n; i++) d[i] = (Math.random()*2-1)*(1-i/n)*0.45*masterVol;
   const s = ac.createBufferSource(); s.buffer = buf;
   s.connect(ac.destination); s.start();
 }
@@ -45,7 +47,7 @@ function playShoot() {
   o.connect(g); g.connect(ac.destination); o.type = 'sine';
   o.frequency.setValueAtTime(700, ac.currentTime);
   o.frequency.exponentialRampToValueAtTime(80, ac.currentTime+0.08);
-  g.gain.setValueAtTime(0.25, ac.currentTime);
+  g.gain.setValueAtTime(0.25*masterVol, ac.currentTime);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+0.08);
   o.start(); o.stop(ac.currentTime+0.08);
 }
@@ -104,6 +106,7 @@ function continueSave(){
   arrowsLeft=sv.arrowsLeft??DS.arrows;
   score=0;freezeTimer=0;refillTimer=0;shopOpen=false;shopScroll=0;
   boss=null;bossSpawned=false;balloons=[];arrows=[];fx=[];popups=[];lightFX=[];
+  bowMaxHp=DS.bowMaxHp||20;bowHp=bowMaxHp;
   spawnT=0;bow=new Bow();
   timeLeft=getTime(level);targetScore=getTarget(level,world);
   startBGM(world-1);gState='playing';ovData=null;
@@ -122,13 +125,13 @@ const getTheme = wo => THEMES[(wo-1)%THEMES.length];
 // ===== DIFFICULTY =====
 const DIFF = {
   easy:  {label:"EASY",  color:"#3CDC64",btn:"#1D8833",speed:0.65,timeMult:1.5, scoreMult:0.6, arrows:20,
-          costMult:0.4, bossHpMult:0.5,
+          costMult:0.4, bossHpMult:0.5, bowMaxHp:30,
           desc:["Slow balloons","50% more time","Shop 60% OFF!","Weaker bosses"]},
   normal:{label:"NORMAL",color:"#50A0FF",btn:"#1A5ABE",speed:1.0, timeMult:1.0, scoreMult:1.0, arrows:10,
-          costMult:1.0, bossHpMult:1.0,
+          costMult:1.0, bossHpMult:1.0, bowMaxHp:20,
           desc:["Normal speed","Normal time","Normal prices","Standard bosses"]},
   hard:  {label:"HARD",  color:"#FF5040",btn:"#AA1914",speed:1.5, timeMult:0.65,scoreMult:1.4, arrows:5,
-          costMult:2.0, bossHpMult:2.0,
+          costMult:2.0, bossHpMult:2.0, bowMaxHp:10,
           desc:["Fast balloons!","35% less time","Prices DOUBLED!","Tougher bosses"]},
 };
 let DS = DIFF.normal;
@@ -394,7 +397,8 @@ function lighten(col,n){const m=col.match(/\d+/g);if(!m)return col;return `rgb($
 let gState='menu';
 let world=1,level=1,score=0,totalScore=0,timeLeft=0,targetScore=0;
 let freezeTimer=0,arrowsLeft=10,refillTimer=0;
-let shopOpen=false,shopScroll=0,paused=false;
+let shopOpen=false,shopScroll=0,paused=false,optionsOpen=false;
+let bowHp=20,bowMaxHp=20;
 let boss=null,bossSpawned=false;
 let upg={};
 let balloons=[],arrows=[],fx=[],popups=[],lightFX=[];
@@ -490,6 +494,7 @@ function resetGame(dk){
   DS=DIFF[dk];world=1;level=1;score=0;totalScore=0;
   freezeTimer=0;refillTimer=0;arrowsLeft=DS.arrows;
   shopOpen=false;shopScroll=0;boss=null;bossSpawned=false;
+  bowMaxHp=DS.bowMaxHp||20;bowHp=bowMaxHp;
   resetUpg();balloons=[];arrows=[];fx=[];popups=[];lightFX=[];
   spawnT=0;bow=new Bow();
   timeLeft=getTime(level);targetScore=getTarget(level,world);
@@ -809,7 +814,25 @@ canvas.addEventListener('click',e=>{
     const dx=mx-130,dy=my-(H-31);
     if(dx*dx+dy*dy<=225){helpOpen=true;helpScroll=0;return;}
     const dx2=mx-160,dy2=my-(H-31);
-    if(dx2*dx2+dy2*dy2<=225){paused=!paused;return;}
+    if(dx2*dx2+dy2*dy2<=225){paused=!paused;optionsOpen=false;return;}
+  }
+  // 옵션 창 열려있을 때
+  if(optionsOpen){
+    const sl=OPT_SLIDER;
+    if(my>=sl.y-10&&my<=sl.y+sl.h+10&&mx>=sl.x&&mx<=sl.x+sl.w){
+      masterVol=Math.max(0,Math.min(1,(mx-sl.x)/sl.w));
+      localStorage.setItem('balloonVol',masterVol);return;
+    }
+    const py2=160,ph2=280;
+    const cb2={x:W/2-80,y:py2+ph2-65,w:160,h:44};
+    if(inR(mx,my,cb2)){optionsOpen=false;return;}
+    return;
+  }
+  // 일시정지 중 OPTIONS 버튼
+  if(paused&&!optionsOpen){
+    const ob={x:W/2-80,y:325,w:160,h:48};
+    if(inR(mx,my,ob)){optionsOpen=true;return;}
+    paused=false;return;  // 패널 밖 클릭 → 재개
   }
   // ① 모드 선택
   if(gState==='menu'){
@@ -875,6 +898,38 @@ canvas.addEventListener('wheel',e=>{
   if(helpOpen){helpScroll=Math.max(0,Math.min(HELP_MAX_SCR,helpScroll+(e.deltaY>0?1:-1)));e.preventDefault();return;}
   if(shopOpen){shopScroll=Math.max(0,Math.min(MAX_SCROLL,shopScroll+(e.deltaY>0?1:-1)));e.preventDefault();}
 },{passive:false});
+
+// ===== OPTIONS 패널 =====
+// 옵션 창: 소리 크기를 슬라이더로 조절할 수 있어!
+// 슬라이더는 막대기인데, 클릭한 위치에 따라 0~100% 사이로 조절돼.
+const OPT_SLIDER={x:220,y:290,w:360,h:20}; // 슬라이더 위치와 크기
+function drawOptions(){
+  // 반투명 배경
+  ctx.fillStyle='rgba(0,0,0,0.82)';ctx.fillRect(0,0,W,H);
+  // 패널
+  const px=W/2-220,py=160,pw=440,ph=280;
+  rr(px,py,pw,ph,18,'#222','#FFD700',2);
+  ctx.font='bold 32px Arial';ctx.fillStyle='#FFD700';ctx.textAlign='center';ctx.fillText('⚙ 옵션',W/2,py+48);
+  // 소리 크기 라벨
+  ctx.font='bold 20px Arial';ctx.fillStyle='#FFF';ctx.textAlign='left';ctx.fillText('🔊 소리 크기',px+40,py+105);
+  ctx.font='16px Arial';ctx.fillStyle='#AAA';ctx.fillText(`${Math.round(masterVol*100)}%`,px+390,py+105);
+  // 슬라이더 배경
+  const sl=OPT_SLIDER;
+  ctx.fillStyle='#444';ctx.fillRect(sl.x,sl.y,sl.w,sl.h);
+  // 슬라이더 채움
+  ctx.fillStyle='#FFD700';ctx.fillRect(sl.x,sl.y,Math.floor(sl.w*masterVol),sl.h);
+  ctx.strokeStyle='#888';ctx.lineWidth=1;ctx.strokeRect(sl.x,sl.y,sl.w,sl.h);
+  // 슬라이더 핸들 (동그라미)
+  const hx=sl.x+Math.floor(sl.w*masterVol);
+  ctx.beginPath();ctx.arc(hx,sl.y+sl.h/2,12,0,Math.PI*2);ctx.fillStyle='#FFF';ctx.fill();ctx.strokeStyle='#FFD700';ctx.lineWidth=2;ctx.stroke();
+  // 0% / 100% 표시
+  ctx.font='13px Arial';ctx.fillStyle='#888';ctx.textAlign='left';ctx.fillText('0%',sl.x,sl.y+sl.h+18);
+  ctx.textAlign='right';ctx.fillText('100%',sl.x+sl.w,sl.y+sl.h+18);
+  // 닫기 버튼
+  const cb2={x:W/2-80,y:py+ph-65,w:160,h:44};
+  rr(cb2.x,cb2.y,cb2.w,cb2.h,10,'#444','#FFA040',2);
+  ctx.font='bold 20px Arial';ctx.fillStyle='#FFF';ctx.textAlign='center';ctx.fillText('← 돌아가기',W/2,cb2.y+cb2.h/2+7);
+}
 
 // ===== 상대방 미니 화면 =====
 function drawOpponentMini(){
@@ -952,14 +1007,16 @@ function gameLoop(ts){
         }
       }
     }
+    for(const b of balloons){if(b.offScreen()){const dmg=b.pts;bowHp=Math.max(0,bowHp-dmg);popups.push(new ScorePopup(bow.x,H-100,-dmg,'#FF4444'));}}
     balloons=balloons.filter(b=>!b.offScreen());
     arrows=arrows.filter(a=>!a.offScreen());
     fx=fx.filter(e=>!e.done());popups=popups.filter(p=>!p.done());lightFX=lightFX.filter(l=>!l.done());
     mpSendScore();
     frameCount++;
     if(frameCount%4===0&&socket&&mpState==='playing'){socket.emit('stateUpdate',{balloons:balloons.map(b=>({x:b.x,y:b.y,r:b.r,color:b.color})),arrows:arrows.map(a=>({x:a.x,y:a.y,angle:a.angle})),boss:boss?{x:boss.x,y:boss.y,r:boss.r,color:boss.color}:null});}
-    if(score>=targetScore&&!boss){saveHS(level,world,totalScore);if(level%100===0){showOv(`WORLD ${world} CLEAR! 🎉`,`Entering World ${world+1}...`,'#FFD700',3500,()=>{world++;level=1;totalScore=0;resetUpg();arrowsLeft=DS.arrows;refillTimer=0;startBGM(world-1);score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];if(gameMode==='single')saveProg();});}else{showOv(`LEVEL ${level} CLEAR!`,`→ Level ${level+1}`,'#32CD32',2000,()=>{level++;score=0;bossSpawned=false;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];if(gameMode==='single')saveProg();});}}
-    if(timeLeft<=0){saveHS(level,world,totalScore);if(gameMode==='single')deleteProg();mpSendScore();mpGameOver();if(socket)socket.emit('saveScore',{playerName:'Player',score:totalScore,world,level,diff:Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal'});const hs=loadHS();showOv('GAME OVER',`World ${world}  Level ${level}  |  Best: W${hs.world} L${hs.level}`,'#DC143C',2500,()=>{if(mpState!=='playing'){gState='menu';stopBGM();startBGM(0);}});}
+    if(score>=targetScore&&!boss){saveHS(level,world,totalScore);if(level%100===0){showOv(`WORLD ${world} CLEAR! 🎉`,`Entering World ${world+1}...`,'#FFD700',3500,()=>{world++;level=1;totalScore=0;resetUpg();arrowsLeft=DS.arrows;refillTimer=0;startBGM(world-1);score=0;bossSpawned=false;bowHp=bowMaxHp;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];if(gameMode==='single')saveProg();});}else{showOv(`LEVEL ${level} CLEAR!`,`→ Level ${level+1}`,'#32CD32',2000,()=>{level++;score=0;bossSpawned=false;bowHp=bowMaxHp;timeLeft=getTime(level);targetScore=getTarget(level,world);balloons=[];arrows=[];if(gameMode==='single')saveProg();});}}
+    if(bowHp<=0&&!ovData){saveHS(level,world,totalScore);if(gameMode==='single')deleteProg();mpSendScore();mpGameOver();if(socket)socket.emit('saveScore',{playerName:'Player',score:totalScore,world,level,diff:Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal'});const hs=loadHS();showOv('💔 활이 부서졌어!',`World ${world}  Level ${level}  |  Best: W${hs.world} L${hs.level}`,'#FF4444',2500,()=>{if(mpState!=='playing'){gState='menu';stopBGM();startBGM(0);}});}
+    if(timeLeft<=0&&bowHp>0){saveHS(level,world,totalScore);if(gameMode==='single')deleteProg();mpSendScore();mpGameOver();if(socket)socket.emit('saveScore',{playerName:'Player',score:totalScore,world,level,diff:Object.keys(DIFF).find(k=>DIFF[k]===DS)||'normal'});const hs=loadHS();showOv('GAME OVER',`World ${world}  Level ${level}  |  Best: W${hs.world} L${hs.level}`,'#DC143C',2500,()=>{if(mpState!=='playing'){gState='menu';stopBGM();startBGM(0);}});}
   }
   if(ovData&&performance.now()>ovData.until){const cb=ovData.cb;ovData=null;if(cb)cb();}
 
@@ -997,8 +1054,10 @@ function gameLoop(ts){
   ctx.fillText(cap===-1?'Arrows: ∞':`Arrows: ${arrowsLeft}/${cap}`,W-10,80);
   const hs=loadHS();ctx.fillStyle='#FFD700';ctx.fillText(`Best: W${hs.world} L${hs.level}`,W-10,98);
   ctx.font='bold 14px Arial';ctx.fillStyle=DS.color;ctx.textAlign='left';ctx.fillText(DS.label,10,62);
+  // 활 HP 바
+  {const bww=120,bwh=10,bwx=10,bwy=68;const ratio=bowHp/bowMaxHp;const hpCol=ratio>0.5?'#44DD44':ratio>0.25?'#FFAA00':'#FF2222';ctx.fillStyle='#333';ctx.fillRect(bwx,bwy,bww,bwh);ctx.fillStyle=hpCol;ctx.fillRect(bwx,bwy,Math.floor(bww*ratio),bwh);ctx.strokeStyle='#888';ctx.lineWidth=1;ctx.strokeRect(bwx,bwy,bww,bwh);ctx.font='11px Arial';ctx.fillStyle='#FFF';ctx.textAlign='left';ctx.fillText(`🏹 ${bowHp}/${bowMaxHp}`,bwx,bwy-2);}
   // 멀티플레이 상대 점수
-  if(mpState==='playing'){ctx.font='bold 16px Arial';ctx.fillStyle='#FF8888';ctx.textAlign='left';ctx.fillText(`👤 상대: ${opponentScore}pts`,10,80);}
+  if(mpState==='playing'){ctx.font='bold 16px Arial';ctx.fillStyle='#FF8888';ctx.textAlign='left';ctx.fillText(`👤 상대: ${opponentScore}pts`,10,92);}
   // charge bar
   if(bow.charging){const bw2=Math.floor(bow.ct/MAX_CHARGE*200);ctx.fillStyle='#32CD32';ctx.fillRect(300,H-25,bw2,15);ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(300,H-25,200,15);ctx.font='15px Arial';ctx.fillStyle='#333';ctx.textAlign='center';ctx.fillText('RELEASE!',400,H-48);}
   // freeze overlay
@@ -1018,7 +1077,8 @@ function gameLoop(ts){
   // hint
   ctx.font='14px Arial';ctx.fillStyle='#888';ctx.textAlign='center';ctx.fillText('← → aim  |  SPACE to shoot',W/2,H-58);
   // overlay
-  if(paused){ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(0,0,W,H);ctx.font='bold 72px Arial';ctx.fillStyle='#FFA040';ctx.textAlign='center';ctx.fillText('⏸ 일시정지',W/2,260);ctx.font='26px Arial';ctx.fillStyle='#CCC';ctx.fillText('P 키 또는 버튼을 눌러서 계속해봐!',W/2,320);}
+  if(paused&&!optionsOpen){ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(0,0,W,H);ctx.font='bold 72px Arial';ctx.fillStyle='#FFA040';ctx.textAlign='center';ctx.fillText('⏸ 일시정지',W/2,240);ctx.font='26px Arial';ctx.fillStyle='#CCC';ctx.fillText('P 키 또는 버튼을 눌러서 계속해봐!',W/2,295);const ob={x:W/2-80,y:325,w:160,h:48};rr(ob.x,ob.y,ob.w,ob.h,12,'#333','#AAA',2);ctx.font='bold 22px Arial';ctx.fillStyle='#FFF';ctx.textAlign='center';ctx.fillText('⚙ OPTIONS',W/2,ob.y+ob.h/2+8);}
+  if(optionsOpen)drawOptions();
   if(ovData){ctx.fillStyle='rgba(0,0,0,0.62)';ctx.fillRect(0,0,W,H);ctx.font='bold 70px Arial';ctx.fillStyle=ovData.color;ctx.textAlign='center';ctx.fillText(ovData.title,W/2,230);ctx.font='32px Arial';ctx.fillStyle='#FFF';ctx.fillText(ovData.sub,W/2,310);}
   if(mpState==='playing')drawOpponentMini();
   if(shopOpen)drawShop();
