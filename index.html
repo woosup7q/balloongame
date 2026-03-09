@@ -394,7 +394,7 @@ function lighten(col,n){const m=col.match(/\d+/g);if(!m)return col;return `rgb($
 let gState='menu';
 let world=1,level=1,score=0,totalScore=0,timeLeft=0,targetScore=0;
 let freezeTimer=0,arrowsLeft=10,refillTimer=0;
-let shopOpen=false,shopScroll=0;
+let shopOpen=false,shopScroll=0,paused=false;
 let boss=null,bossSpawned=false;
 let upg={};
 let balloons=[],arrows=[],fx=[],popups=[],lightFX=[];
@@ -758,7 +758,8 @@ window.addEventListener('keydown',e=>{
     if(gState==='serverList'){gState='diffSelect';return;}
     if(gState==='waiting'){gState='serverList';if(socket)socket.emit('leaveRoom');return;}
   }
-  if(gState!=='playing'||shopOpen||ovData)return;
+  if(e.code==='KeyP'&&gState==='playing'&&!shopOpen&&!ovData&&!helpOpen){paused=!paused;return;}
+  if(gState!=='playing'||shopOpen||ovData||paused)return;
   if(e.code==='Space'){bow.charging=true;bow.ct=0;}
 });
 window.addEventListener('keyup',e=>{
@@ -807,6 +808,8 @@ canvas.addEventListener('click',e=>{
   if(gState==='playing'){
     const dx=mx-130,dy=my-(H-31);
     if(dx*dx+dy*dy<=225){helpOpen=true;helpScroll=0;return;}
+    const dx2=mx-160,dy2=my-(H-31);
+    if(dx2*dx2+dy2*dy2<=225){paused=!paused;return;}
   }
   // ① 모드 선택
   if(gState==='menu'){
@@ -912,7 +915,7 @@ function gameLoop(ts){
   if(gState==='result'){drawResult();requestAnimationFrame(gameLoop);return;}
 
   // ---- UPDATE ----
-  if(!shopOpen&&!ovData&&!helpOpen){
+  if(!shopOpen&&!ovData&&!helpOpen&&!paused){
     if(keysDown['ArrowLeft']) bow.rotate(-1);
     if(keysDown['ArrowRight']) bow.rotate(1);
     if(bow.charging) bow.ct=Math.min(bow.ct+dt,MAX_CHARGE);
@@ -1008,9 +1011,14 @@ function gameLoop(ts){
   ctx.beginPath();ctx.arc(130,H-31,15,0,Math.PI*2);ctx.fillStyle='#3C50B4';ctx.fill();
   ctx.strokeStyle='#8CA0FF';ctx.lineWidth=2;ctx.stroke();
   ctx.font='bold 16px Arial';ctx.fillStyle='#FFF';ctx.textAlign='center';ctx.fillText('?',130,H-25);
+  // ⏸ 멈춤 버튼 (? 오른쪽)
+  ctx.beginPath();ctx.arc(160,H-31,15,0,Math.PI*2);ctx.fillStyle=paused?'#884400':'#444';ctx.fill();
+  ctx.strokeStyle=paused?'#FFA040':'#888';ctx.lineWidth=2;ctx.stroke();
+  ctx.font='bold 15px Arial';ctx.fillStyle='#FFF';ctx.textAlign='center';ctx.fillText(paused?'▶':'⏸',160,H-25);
   // hint
   ctx.font='14px Arial';ctx.fillStyle='#888';ctx.textAlign='center';ctx.fillText('← → aim  |  SPACE to shoot',W/2,H-58);
   // overlay
+  if(paused){ctx.fillStyle='rgba(0,0,0,0.65)';ctx.fillRect(0,0,W,H);ctx.font='bold 72px Arial';ctx.fillStyle='#FFA040';ctx.textAlign='center';ctx.fillText('⏸ 일시정지',W/2,260);ctx.font='26px Arial';ctx.fillStyle='#CCC';ctx.fillText('P 키 또는 버튼을 눌러서 계속해봐!',W/2,320);}
   if(ovData){ctx.fillStyle='rgba(0,0,0,0.62)';ctx.fillRect(0,0,W,H);ctx.font='bold 70px Arial';ctx.fillStyle=ovData.color;ctx.textAlign='center';ctx.fillText(ovData.title,W/2,230);ctx.font='32px Arial';ctx.fillStyle='#FFF';ctx.fillText(ovData.sub,W/2,310);}
   if(mpState==='playing')drawOpponentMini();
   if(shopOpen)drawShop();
